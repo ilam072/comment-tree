@@ -11,6 +11,7 @@ import (
 type CommentRepo interface {
 	CreateComment(ctx context.Context, comment domain.Comment) (int, error)
 	Exists(ctx context.Context, id int) (bool, error)
+	GetCommentsByParent(ctx context.Context, parentID int) ([]domain.Comment, error)
 }
 
 type Comment struct {
@@ -51,4 +52,32 @@ func (c *Comment) SaveComment(ctx context.Context, comment dto.Comment) (int, er
 	}
 
 	return id, nil
+}
+
+func (c *Comment) GetCommentsByParent(ctx context.Context, parentID int) (dto.Comments, error) {
+	const op = "service.comment.GetCommentsByParent"
+
+	comments, err := c.repo.GetCommentsByParent(ctx, parentID)
+	if err != nil {
+		return dto.Comments{}, errutils.Wrap(op, err)
+	}
+
+	return domainToDtoComment(comments), nil
+}
+
+func domainToDtoComment(comments []domain.Comment) dto.Comments {
+	dtoComments := dto.Comments{Comments: make([]dto.Comment, 0, len(comments))}
+
+	for _, comment := range comments {
+		dtoComment := dto.Comment{
+			ID:       comment.ID,
+			Text:     comment.Text,
+			ParentID: comment.ParentID,
+			UserID:   comment.UserID,
+		}
+
+		dtoComments.Comments = append(dtoComments.Comments, dtoComment)
+	}
+
+	return dtoComments
 }
