@@ -45,3 +45,35 @@ func (r *CommentRepo) Exists(ctx context.Context, id int) (bool, error) {
 	}
 	return exists, nil
 }
+
+func (r *CommentRepo) GetCommentsByParent(ctx context.Context, parentID int) ([]domain.Comment, error) {
+	const op = "repo.comment.GetAllNested"
+
+	query := `WITH RECURSIVE tree AS (
+            SELECT id, parent_id, text, user_id, created_at
+            FROM comments
+            WHERE id = $1
+            UNION ALL
+            SELECT c.id, c.parent_id, c.text, c.user_id, c.created_at
+            FROM comments c
+            JOIN tree t ON c.parent_id = t.id
+        )
+        SELECT id, parent_id, text, user_id, created_at FROM tree ORDER BY created_at;`
+
+	rows, err := r.db.QueryContext(ctx, query, parentID)
+	if err != nil {
+		return nil, errutils.Wrap(op, err)
+	}
+	defer rows.Close()
+
+	var comments []domain.Comment
+	for rows.Next() {
+		var c domain.Comment
+		if err := rows.Scan(&c.ID, &c.ParentID, &c.Text, &c.UserID, &c.CreatedAt); err != nil {
+			return nil, errutils.Wrap(op, err)
+		}
+		comments = append(comments, c)
+	}
+
+	return comments, nil
+}
