@@ -11,10 +11,12 @@ import (
 	"github.com/wb-go/wbf/ginext"
 	"github.com/wb-go/wbf/zlog"
 	"net/http"
+	"strconv"
 )
 
 type Comment interface {
 	SaveComment(ctx context.Context, comment dto.Comment) (int, error)
+	GetCommentsByParent(ctx context.Context, parentID int) ([]dto.Comment, error)
 }
 
 type Validator interface {
@@ -24,10 +26,6 @@ type Validator interface {
 type CommentHandler struct {
 	comment   Comment
 	validator Validator
-}
-
-type CreateCommentResponse struct {
-	ID int `json:"id"`
 }
 
 func (h *CommentHandler) CreateComment(c *ginext.Context) {
@@ -54,4 +52,21 @@ func (h *CommentHandler) CreateComment(c *ginext.Context) {
 	}
 
 	response.Success(commentID).WriteJSON(c, http.StatusCreated)
+}
+
+func (h *CommentHandler) GetCommentTree(c *ginext.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		response.Error("invalid id, must be integer").WriteJSON(c, http.StatusBadRequest)
+		return
+	}
+
+	comments, err := h.comment.GetCommentsByParent(c.Request.Context(), id)
+	if err != nil {
+		zlog.Logger.Error().Err(err).Int("id", id).Msg("failed to get comments by parent")
+		response.Error("internal server error, try again later").WriteJSON(c, http.StatusInternalServerError)
+		return
+	}
+
+	response.Raw(c, http.StatusOK, comments)
 }
