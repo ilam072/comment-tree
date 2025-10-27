@@ -1,6 +1,7 @@
 package service
 
 import (
+	"comment-tree/internal/comment/repo"
 	"comment-tree/internal/comment/types/domain"
 	"comment-tree/internal/comment/types/dto"
 	"comment-tree/pkg/errutils"
@@ -13,6 +14,7 @@ type CommentRepo interface {
 	Exists(ctx context.Context, id int) (bool, error)
 	GetCommentsByParent(ctx context.Context, parentID int) ([]domain.Comment, error)
 	GetComments(ctx context.Context, search string, page, pageSize int, sort string) ([]domain.Comment, error)
+	DeleteComment(ctx context.Context, id int) error
 }
 
 type Comment struct {
@@ -20,7 +22,8 @@ type Comment struct {
 }
 
 var (
-	ErrParentNotFound = errors.New("parent comment not found")
+	ErrParentNotFound  = errors.New("parent comment not found")
+	ErrCommentNotFound = errors.New("comment not found")
 )
 
 func New(repo CommentRepo) *Comment {
@@ -92,4 +95,17 @@ func domainToDtoComment(comments []domain.Comment) dto.Comments {
 	}
 
 	return dtoComments
+}
+
+func (c *Comment) DeleteComment(ctx context.Context, id int) error {
+	const op = "service.comment.Delete"
+
+	if err := c.repo.DeleteComment(ctx, id); err != nil {
+		if errors.Is(err, repo.ErrCommentNotFound) {
+			return errutils.Wrap(op, ErrCommentNotFound)
+		}
+		return errutils.Wrap(op, err)
+	}
+
+	return nil
 }
