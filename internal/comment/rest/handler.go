@@ -12,11 +12,13 @@ import (
 	"github.com/wb-go/wbf/zlog"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 type Comment interface {
 	SaveComment(ctx context.Context, comment dto.Comment) (int, error)
 	GetCommentsByParent(ctx context.Context, parentID int) ([]dto.Comment, error)
+	GetComments(ctx context.Context, search string, page, pageSize int, sort string) (dto.Comments, error)
 }
 
 type Validator interface {
@@ -64,6 +66,36 @@ func (h *CommentHandler) GetCommentTree(c *ginext.Context) {
 	comments, err := h.comment.GetCommentsByParent(c.Request.Context(), id)
 	if err != nil {
 		zlog.Logger.Error().Err(err).Int("id", id).Msg("failed to get comments by parent")
+		response.Error("internal server error, try again later").WriteJSON(c, http.StatusInternalServerError)
+		return
+	}
+
+	response.Raw(c, http.StatusOK, comments)
+}
+
+func (h *CommentHandler) GetComments(c *ginext.Context) {
+	search := c.Query("search")
+
+	sort := strings.ToUpper(c.DefaultQuery("sort", "ASC"))
+	if sort != "ASC" && sort != "DESC" {
+		sort = "ASC"
+	}
+
+	// page
+	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if err != nil || page <= 0 {
+		page = 1
+	}
+
+	// pageSize
+	pageSize, err := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	if err != nil || pageSize <= 0 {
+		pageSize = 10
+	}
+
+	comments, err := h.comment.GetComments(c.Request.Context(), search, page, pageSize, sort)
+	if err != nil {
+		zlog.Logger.Error().Err(err).Msg("failed to get comments")
 		response.Error("internal server error, try again later").WriteJSON(c, http.StatusInternalServerError)
 		return
 	}
