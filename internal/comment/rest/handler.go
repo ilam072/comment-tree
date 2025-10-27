@@ -16,8 +16,8 @@ import (
 )
 
 type Comment interface {
-	SaveComment(ctx context.Context, comment dto.Comment) (int, error)
-	GetCommentsByParent(ctx context.Context, parentID int) ([]dto.Comment, error)
+	SaveComment(ctx context.Context, comment dto.CreateComment) (int, error)
+	GetCommentsByParent(ctx context.Context, parentID int) (dto.Comments, error)
 	GetComments(ctx context.Context, search string, page, pageSize int, sort string) (dto.Comments, error)
 	DeleteComment(ctx context.Context, id int) error
 }
@@ -32,7 +32,7 @@ type CommentHandler struct {
 }
 
 func (h *CommentHandler) CreateComment(c *ginext.Context) {
-	var comment dto.Comment
+	var comment dto.CreateComment
 	if err := json.NewDecoder(c.Request.Body).Decode(&comment); err != nil {
 		response.Error("invalid request body").WriteJSON(c, http.StatusBadRequest)
 		return

@@ -30,7 +30,7 @@ func New(repo CommentRepo) *Comment {
 	return &Comment{repo: repo}
 }
 
-func (c *Comment) SaveComment(ctx context.Context, comment dto.Comment) (int, error) {
+func (c *Comment) SaveComment(ctx context.Context, comment dto.CreateComment) (int, error) {
 	const op = "service.comment.Save"
 
 	parentID := comment.ParentID
@@ -80,23 +80,6 @@ func (c *Comment) GetComments(ctx context.Context, search string, page, pageSize
 	return domainToDtoComment(comments), nil
 }
 
-func domainToDtoComment(comments []domain.Comment) dto.Comments {
-	dtoComments := dto.Comments{Comments: make([]dto.Comment, 0, len(comments))}
-
-	for _, comment := range comments {
-		dtoComment := dto.Comment{
-			ID:       comment.ID,
-			Text:     comment.Text,
-			ParentID: comment.ParentID,
-			UserID:   comment.UserID,
-		}
-
-		dtoComments.Comments = append(dtoComments.Comments, dtoComment)
-	}
-
-	return dtoComments
-}
-
 func (c *Comment) DeleteComment(ctx context.Context, id int) error {
 	const op = "service.comment.Delete"
 
@@ -108,4 +91,21 @@ func (c *Comment) DeleteComment(ctx context.Context, id int) error {
 	}
 
 	return nil
+}
+
+func domainToDtoComment(comments []domain.Comment) dto.Comments {
+	dtoComments := dto.Comments{Comments: make([]dto.GetComment, 0, len(comments))}
+
+	for _, comment := range comments {
+		dtoComment := dto.GetComment{
+			ID:       comment.ID,
+			Text:     comment.Text,
+			ParentID: comment.ParentID,
+			UserID:   comment.UserID,
+		}
+
+		dtoComments.Comments = append(dtoComments.Comments, dtoComment)
+	}
+
+	return dtoComments
 }
