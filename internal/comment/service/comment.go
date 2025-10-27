@@ -12,6 +12,7 @@ type CommentRepo interface {
 	CreateComment(ctx context.Context, comment domain.Comment) (int, error)
 	Exists(ctx context.Context, id int) (bool, error)
 	GetCommentsByParent(ctx context.Context, parentID int) ([]domain.Comment, error)
+	GetComments(ctx context.Context, search string, page, pageSize int, sort string) ([]domain.Comment, error)
 }
 
 type Comment struct {
@@ -58,6 +59,17 @@ func (c *Comment) GetCommentsByParent(ctx context.Context, parentID int) (dto.Co
 	const op = "service.comment.GetCommentsByParent"
 
 	comments, err := c.repo.GetCommentsByParent(ctx, parentID)
+	if err != nil {
+		return dto.Comments{}, errutils.Wrap(op, err)
+	}
+
+	return domainToDtoComment(comments), nil
+}
+
+func (c *Comment) GetComments(ctx context.Context, search string, page, pageSize int, sort string) (dto.Comments, error) {
+	const op = "service.comment.GetComments"
+
+	comments, err := c.repo.GetComments(ctx, search, page, pageSize, sort)
 	if err != nil {
 		return dto.Comments{}, errutils.Wrap(op, err)
 	}
