@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Дерево комментариев</title>
+    <style>
+        body { font-family: sans-serif; max-width: 700px; margin: 40px auto; background: #f9f9f9; padding: 20px; border-radius: 10px; }
+        h2 { text-align: center; }
+        .comment { background: #fff; padding: 10px; margin: 6px 0; border-radius: 8px; border: 1px solid #ddd; }
+        .comment .meta { font-size: 12px; color: #777; }
+        .comment button { margin-right: 5px; cursor: pointer; }
+        .reply-form { margin-top: 8px; }
+        .nested { margin-left: 30px; border-left: 2px solid #ddd; padding-left: 10px; }
+        input, textarea, select { width: 100%; padding: 6px; margin: 4px 0; }
+        #search { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; align-items: center;}
+        #search input { flex: 1 1 200px; min-width: 200px; }
+        #search select, #search button { flex: 0 0 auto; }
+        #new-comment { margin-top: 20px; }
+        #pagination { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+<h2>Комментарии</h2>
+
+<div id="search">
+    <input type="text" id="searchInput" placeholder="Поиск по комментариям...">
+    <select id="sortSelect">
+        <option value="ASC">Сначала старые</option>
+        <option value="DESC">Сначала новые</option>
+    </select>
+    <button onclick="applyFilters()">Применить</button>
+    <button onclick="resetFilters()">Сбросить</button>
+</div>
+
+<div id="comments"></div>
+
+<div id="pagination">
+    <button onclick="prevPage()">« Назад</button>
+    <span id="pageInfo"></span>
+    <button onclick="nextPage()">Вперед »</button>
+</div>
+
+<div id="new-comment">
+    <h3>Добавить комментарий</h3>
+    <textarea id="commentText" placeholder="Введите комментарий..."></textarea>
+    <button onclick="addComment()">Отправить</button>
+</div>
+
+<script>
+    const API_URL = "http://localhost:8080/api/comments";
+    let currentPage = 1;
+    const pageSize = 10;
+
+    async function loadComments(search = "", page = 1, sort = "ASC") {
+        const url = new URL(API_URL);
+        url.searchParams.append("search", search);
+        url.searchParams.append("page", page);
+        url.searchParams.append("page_size", pageSize);
+        url.searchParams.append("sort", sort);
+
+        const res = await fetch(url);
+        const data = await res.json();
+        renderComments(data.comments || []);
+        updatePageInfo(page);
+    }
+
+    function applyFilters(page = currentPage) {
+        const search = document.getElementById("searchInput").value.trim();
+        const sort = document.getElementById("sortSelect").value;
+        loadComments(search, page, sort);
+    }
+
+    function resetFilters() {
+        document.getElementById("searchInput").value = "";
+        document.getElementById("sortSelect").value = "ASC";
+        currentPage = 1;
+        applyFilters(currentPage);
+    }
+
+    function nextPage() {
+        currentPage++;
+        applyFilters(currentPage);
+    }
+
+    function prevPage() {
+        if (currentPage > 1) {
+            currentPage--;
+            applyFilters(currentPage);
+        }
+    }
+
+    function updatePageInfo(page) {
+        document.getElementById("pageInfo").textContent = `Страница ${page}`;
+    }
+
+    async function searchComments() {
+        const query = document.getElementById("searchInput").value.trim();
+        currentPage = 1;
+        const sort = document.getElementById("sortSelect").value;
+        await loadComments(query, currentPage, sort);
+    }
+
+    async function addComment(parentId = null) {
+        const text = parentId ?
+            document.getElementById(`replyText-${parentId}`).value.trim() :
+            document.getElementById("commentText").value.trim();
+
+        if (!text) return alert("Введите текст комментария");
+
+        const body = { text, user_id: 1, parent_id: parentId };
+        const res = await fetch(API_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+        if (res.ok) {
+            if (!parentId) document.getElementById("commentText").value = "";
+            else document.getElementById(`replyText-${parentId}`).value = "";
+            applyFilters();
+        } else {
+            alert("Ошибка при добавлении комментария");
+        }
+    }
+
+    async function deleteComment(id) {
+        if (!confirm("Удалить комментарий?")) return;
+        const res = await fetch(`${API_URL}/${id}`, { method: "DELETE" });
+        if (res.ok) applyFilters();
+        else alert("Ошибка при удалении");
+    }
+
+    function renderComments(comments) {
+        const container = document.getElementById("comments");
+        container.innerHTML = "";
+        const tree = buildTree(comments);
+        tree.forEach(c => container.appendChild(renderCommentNode(c)));
+    }
+
+    function buildTree(comments) {
+        const map = {};
+        comments.forEach(c => map[c.id] = { ...c, children: [] });
+
+        const roots = [];
+        comments.forEach(c => {
+            if (c.parent_id) {
+                if (map[c.parent_id]) {
+                    map[c.parent_id].children.push(map[c.id]);
+                } else {
+                    roots.push(map[c.id]);
+                }
+            } else {
+                roots.push(map[c.id]);
+            }
+        });
+
+        return roots;
+    }
+
+    function renderCommentNode(comment) {
+        const div = document.createElement("div");
+        div.className = "comment";
+
+        div.innerHTML = `
+        <div><b>Пользователь #${comment.user_id}</b></div>
+        <div>${comment.text}</div>
+        <div class="meta">ID: ${comment.id}</div>
+        <button onclick="showReplyForm(${comment.id})">Ответить</button>
+        <button onclick="deleteComment(${comment.id})">Удалить</button>
+        <div id="replyForm-${comment.id}" class="reply-form" style="display:none;">
+            <textarea id="replyText-${comment.id}" placeholder="Введите ответ..."></textarea>
+            <button onclick="addComment(${comment.id})">Отправить</button>
+        </div>
+    `;
+
+        if (comment.children?.length) {
+            const nested = document.createElement("div");
+            nested.className = "nested";
+            comment.children.forEach(child => nested.appendChild(renderCommentNode(child)));
+            div.appendChild(nested);
+        }
+
+        return div;
+    }
+
+    function showReplyForm(id) {
+        const form = document.getElementById(`replyForm-${id}`);
+        form.style.display = form.style.display === "none" ? "block" : "none";
+    }
+
+    // Загрузка при старте
+    loadComments();
+</script>
+</body>
+</html>
