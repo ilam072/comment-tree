@@ -31,9 +31,14 @@ type CommentHandler struct {
 	validator Validator
 }
 
+func NewCommentHandler(comment Comment, validator Validator) *CommentHandler {
+	return &CommentHandler{comment: comment, validator: validator}
+}
+
 func (h *CommentHandler) CreateComment(c *ginext.Context) {
 	var comment dto.CreateComment
 	if err := json.NewDecoder(c.Request.Body).Decode(&comment); err != nil {
+		zlog.Logger.Error().Err(err).Msg("failed to decode")
 		response.Error("invalid request body").WriteJSON(c, http.StatusBadRequest)
 		return
 	}
