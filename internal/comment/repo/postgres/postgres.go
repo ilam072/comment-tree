@@ -4,7 +4,9 @@ import (
 	"comment-tree/internal/comment/types/domain"
 	"comment-tree/pkg/errutils"
 	"context"
+	"fmt"
 	"github.com/wb-go/wbf/dbpg"
+	"strings"
 )
 
 type CommentRepo struct {
@@ -19,7 +21,7 @@ func (r *CommentRepo) CreateComment(ctx context.Context, comment domain.Comment)
 	const op = "repo.comment.Create"
 
 	query := `
-        INSERT INTO comments (text, parent_id, user_id)
+        INSERT INTO comments(text, parent_id, user_id)
         VALUES ($1, $2, $3)
         RETURNING id;
     `
@@ -47,7 +49,7 @@ func (r *CommentRepo) Exists(ctx context.Context, id int) (bool, error) {
 }
 
 func (r *CommentRepo) GetCommentsByParent(ctx context.Context, parentID int) ([]domain.Comment, error) {
-	const op = "repo.comment.GetAllNested"
+	const op = "repo.comment.GetCommentsByParent"
 
 	query := `WITH RECURSIVE tree AS (
             SELECT id, parent_id, text, user_id, created_at
@@ -76,4 +78,48 @@ func (r *CommentRepo) GetCommentsByParent(ctx context.Context, parentID int) ([]
 	}
 
 	return comments, nil
+}
+
+func (r *CommentRepo) GetComments(ctx context.Context, search string, page, pageSize int, sort string) ([]domain.Comment, error) {
+	const op = "repo.comment.GetComments"
+
+	offset := (page - 1) * pageSize
+
+	query := `SELECT id, parent_id, text, user_id, created_at FROM comments`
+
+	var (
+		conditions []string
+		args       []interface{}
+	)
+
+	if search != "" {
+		conditions = append(conditions, fmt.Sprintf("document @@ plainto_tsquery('russian', $%d)", len(args)+1))
+		args = append(args, search)
+	}
+
+	if len(conditions) > 0 {
+		query += " WHERE " + strings.Join(conditions, " AND ")
+	}
+
+	query += fmt.Sprintf(" ORDER BY created_at %s", sort)
+
+	query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", len(args)+1, len(args)+2)
+	args = append(args, pageSize, offset)
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, errutils.Wrap(op, err)
+	}
+	defer rows.Close()
+
+	var comments []domain.Comment
+	for rows.Next() {
+		var c domain.Comment
+		if err := rows.Scan(&c.ID, &c.ParentID, &c.Text, &c.UserID, &c.CreatedAt); err != nil {
+			return nil, errutils.Wrap(op, err)
+		}
+		comments = append(comments, c)
+	}
+
+	return comments, rows.Err()
 }
