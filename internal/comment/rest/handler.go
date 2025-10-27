@@ -19,6 +19,7 @@ type Comment interface {
 	SaveComment(ctx context.Context, comment dto.Comment) (int, error)
 	GetCommentsByParent(ctx context.Context, parentID int) ([]dto.Comment, error)
 	GetComments(ctx context.Context, search string, page, pageSize int, sort string) (dto.Comments, error)
+	DeleteComment(ctx context.Context, id int) error
 }
 
 type Validator interface {
@@ -101,4 +102,24 @@ func (h *CommentHandler) GetComments(c *ginext.Context) {
 	}
 
 	response.Raw(c, http.StatusOK, comments)
+}
+
+func (h *CommentHandler) DeleteComment(c *ginext.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		response.Error("invalid id, must be integer").WriteJSON(c, http.StatusBadRequest)
+		return
+	}
+
+	if err := h.comment.DeleteComment(c.Request.Context(), id); err != nil {
+		if errors.Is(err, service.ErrCommentNotFound) {
+			response.Error("comment with such id not found").WriteJSON(c, http.StatusNotFound)
+			return
+		}
+		zlog.Logger.Error().Err(err).Int("id", id).Msg("failed to delete comment")
+		response.Error("internal server error, try again later").WriteJSON(c, http.StatusInternalServerError)
+		return
+	}
+
+	c.Status(http.StatusOK)
 }
