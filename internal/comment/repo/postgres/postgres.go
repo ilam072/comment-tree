@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"comment-tree/internal/comment/repo"
 	"comment-tree/internal/comment/types/domain"
 	"comment-tree/pkg/errutils"
 	"context"
@@ -122,4 +123,26 @@ func (r *CommentRepo) GetComments(ctx context.Context, search string, page, page
 	}
 
 	return comments, rows.Err()
+}
+
+func (r *CommentRepo) DeleteComment(ctx context.Context, id int) error {
+	const op = "repo.comment.Delete"
+
+	query := `DELETE FROM comments WHERE id = $1`
+
+	res, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return errutils.Wrap(op, err)
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return errutils.Wrap(op, err)
+	}
+
+	if rows == 0 {
+		return errutils.Wrap(op, repo.ErrCommentNotFound)
+	}
+
+	return nil
 }
