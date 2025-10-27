@@ -1,0 +1,39 @@
+version: "3.9"
+
+services:
+    postgres:
+        image: postgres:16
+        container_name: comment-tree-postgres
+        restart: always
+        environment:
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: postgres
+            POSTGRES_DB: comment_tree_db
+        ports:
+            - "5433:5432"
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U postgres"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+
+    migrator:
+        image: migrate/migrate:latest
+        container_name: comment-tree-migrator
+        depends_on:
+            postgres:
+                condition: service_healthy
+        volumes:
+            - ./migrations:/migrations
+        entrypoint: [
+            "migrate",
+            "-path", "/migrations",
+            "-database", "postgres://postgres:postgres@postgres:5432/comment_tree_db?sslmode=disable",
+            "up"
+        ]
+        restart: "on-failure"
+
+volumes:
+    postgres_data:
