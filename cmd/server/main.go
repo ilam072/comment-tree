@@ -5,6 +5,7 @@ import (
 	"comment-tree/internal/comment/rest"
 	"comment-tree/internal/comment/service"
 	"comment-tree/internal/config"
+	"comment-tree/internal/middlewares"
 	"comment-tree/internal/validator"
 	"comment-tree/pkg/db"
 	"context"
@@ -49,7 +50,7 @@ func main() {
 	engine := ginext.New("")
 	engine.Use(ginext.Logger())
 	engine.Use(ginext.Recovery())
-	engine.Use(CORSMiddleware())
+	engine.Use(middlewares.CORS())
 
 	apiGroup := engine.Group("/api")
 	apiGroup.POST("/comments", commentHandler.CreateComment)
@@ -81,21 +82,5 @@ func main() {
 
 	if err := DB.Master.Close(); err != nil {
 		zlog.Logger.Error().Err(err).Msg("failed to close master database")
-	}
-}
-
-func CORSMiddleware() ginext.HandlerFunc {
-	return func(c *ginext.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
-
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(http.StatusNoContent)
-			return
-		}
-
-		c.Next()
 	}
 }
