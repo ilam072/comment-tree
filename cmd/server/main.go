@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "comment-tree/docs"
 	"comment-tree/internal/comment/repo/postgres"
 	"comment-tree/internal/comment/rest"
 	"comment-tree/internal/comment/service"
@@ -9,6 +10,8 @@ import (
 	"comment-tree/internal/validator"
 	"comment-tree/pkg/db"
 	"context"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/wb-go/wbf/ginext"
 	"github.com/wb-go/wbf/zlog"
 	"net/http"
@@ -17,6 +20,11 @@ import (
 	"time"
 )
 
+// @title Comment Tree API
+// @version 1.0
+// @description REST API сервиса управления комментариями с поддержкой вложенных комментариев.
+// @BasePath /api
+// @schemes http
 func main() {
 	// Initialize logger
 	zlog.Init()
@@ -25,7 +33,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
 
-	// Initialize config
+	// Load config
 	cfg := config.MustLoad()
 
 	// Connect to DB
@@ -43,7 +51,7 @@ func main() {
 	// Initialize comment service
 	commentService := service.New(commentRepo)
 
-	// Initialize comment repository
+	// Initialize comment handler
 	commentHandler := rest.NewCommentHandler(commentService, v)
 
 	// Initialize Gin engine
@@ -52,13 +60,16 @@ func main() {
 	engine.Use(ginext.Recovery())
 	engine.Use(middlewares.CORS())
 
+	// Swagger endpoint
+	engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
 	apiGroup := engine.Group("/api")
 	apiGroup.POST("/comments", commentHandler.CreateComment)
 	apiGroup.GET("/comments/:id", commentHandler.GetCommentTree)
 	apiGroup.GET("/comments", commentHandler.GetComments)
 	apiGroup.DELETE("/comments/:id", commentHandler.DeleteComment)
 
-	// Initialize and start http server
+	// Start HTTP server
 	server := &http.Server{
 		Addr:    cfg.Server.HTTPPort,
 		Handler: engine,

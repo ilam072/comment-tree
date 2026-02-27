@@ -1,0 +1,186 @@
+basePath: /api
+definitions:
+  dto.Comments:
+    properties:
+      comments:
+        items:
+          $ref: '#/definitions/dto.GetComment'
+        type: array
+    type: object
+  dto.CreateComment:
+    properties:
+      parent_id:
+        type: integer
+      text:
+        type: string
+      user_id:
+        type: integer
+    required:
+    - text
+    - user_id
+    type: object
+  dto.GetComment:
+    properties:
+      id:
+        type: integer
+      parent_id:
+        type: integer
+      text:
+        type: string
+      user_id:
+        type: integer
+    required:
+    - text
+    - user_id
+    type: object
+  response.Response:
+    properties:
+      payload: {}
+      status:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: REST API сервиса управления комментариями с поддержкой вложенных комментариев.
+  title: Comment Tree API
+  version: "1.0"
+paths:
+  /comments:
+    get:
+      description: Returns paginated list of comments with optional search and sorting.
+      parameters:
+      - description: Search by text
+        in: query
+        name: search
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      - default: ASC
+        description: Sort order (ASC or DESC)
+        enum:
+        - ASC
+        - DESC
+        in: query
+        name: sort
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Comments'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Get comments list
+      tags:
+      - comments
+    post:
+      consumes:
+      - application/json
+      description: Create a new comment. Can be root (without parent_id) or reply
+        to another comment.
+      parameters:
+      - description: Comment data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateComment'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created comment ID
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                payload:
+                  type: integer
+              type: object
+        "400":
+          description: Invalid request body or validation error
+          schema:
+            $ref: '#/definitions/response.Response'
+        "404":
+          description: Parent not found
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Create comment
+      tags:
+      - comments
+  /comments/{id}:
+    delete:
+      description: Deletes comment by ID.
+      parameters:
+      - description: Comment ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Invalid ID
+          schema:
+            $ref: '#/definitions/response.Response'
+        "404":
+          description: Comment not found
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Delete comment
+      tags:
+      - comments
+    get:
+      description: Returns all nested comments for a given parent comment ID.
+      parameters:
+      - description: Parent comment ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Comments'
+        "400":
+          description: Invalid ID
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Get comment tree by parent ID
+      tags:
+      - comments
+schemes:
+- http
+swagger: "2.0"
