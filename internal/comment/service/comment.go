@@ -9,6 +9,7 @@ import (
 	"errors"
 )
 
+//go:generate mockgen -source=comment.go -destination=../mocks/service_mocks.go -package=mocks
 type CommentRepo interface {
 	CreateComment(ctx context.Context, comment domain.Comment) (int, error)
 	Exists(ctx context.Context, id int) (bool, error)
